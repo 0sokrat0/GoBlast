@@ -1,43 +1,45 @@
-# Микросервис рассылки сообщений для Telegram
----
+# **Микросервис рассылки сообщений для Telegram**
+
+[![GitHub](https://img.shields.io/badge/GoBlast-GitHub-blue?logo=github)](https://github.com/0sokrat0/GoBlast)
+[![Telegram](https://img.shields.io/badge/GoBlast-Telegram-blue?logo=telegram)](https://t.me/SOKRAT_00)
 
 ![GoBlast](https://blog.jetbrains.com/wp-content/uploads/2021/02/Go_8001611039611515.gif)
 
-Этот микросервис предназначен для массовой рассылки сообщений через Telegram с использованием NATS для очередей и Redis для дедупликации. Проект построен на основе **Standard Go Project Layout**
+**GoBlast** — это микросервис для массовой рассылки сообщений через Telegram с использованием **NATS** для очередей и **Redis** для дедупликации. Проект построен на основе **Standard Go Project Layout** и поддерживает многопользовательскую работу с приоритетами и мониторингом.
 
 ---
 
-## Основной функционал
+## **Основной функционал**
 
 1. **Поддержка всех типов сообщений**:
-   - Текст (`text`)
-   - Фото (`photo`)
-   - Видео (`video`)
-   - Голосовые сообщения (`voice`)
-   - Кружки (`animation`)
-   - Документы (`document`)
+    - Текст (`text`)
+    - Фото (`photo`)
+    - Видео (`video`)
+    - Голосовые сообщения (`voice`)
+    - Анимации (`animation`)
+    - Документы (`document`)
 
 2. **Многопользовательская поддержка**:
-   - Авторизация через `access_token`.
-   - Изоляция задач по пользователям.
+    - Авторизация через `access_token`.
+    - Изоляция задач между пользователями.
 
 3. **Регулируемая скорость**:
-   - Приоритеты (`high`, `medium`, `low`) для оптимизации нагрузки.
+    - Поддержка приоритетов (`high`, `medium`, `low`) для оптимальной нагрузки.
 
-4. **Дедупликация**:
-   - Проверка уникальности сообщений через Redis.
+4. **Дедупликация сообщений**:
+    - Проверка уникальности сообщений с использованием Redis.
 
 5. **Асинхронная обработка**:
-   - Очереди задач через NATS.
-   - Параллельная обработка с помощью воркеров.
+    - Очереди задач через **NATS**.
+    - Параллельная обработка задач с помощью воркеров.
 
-6. **Мониторинг и логи**:
-   - Метрики Prometheus (количество задач, время выполнения, ошибки).
-   - Логирование через logrus.
+6. **Мониторинг и логирование**:
+    - Метрики **Prometheus**: количество задач, время обработки, ошибки.
+    - Логирование через **Zap**.
 
 ---
 
-## Архитектура проекта
+## **Архитектура проекта**
 
 ```plaintext
 +----------------------+      +---------------------------+
@@ -57,115 +59,154 @@
                   +---------------------------+
                    /             |             \
        +----------------+ +----------------+ +----------------+
-       | Telegram API   | |  Redis / DB     | |   Логи         |
+       | Telegram API   | |  Redis / DB     | |   Логирование  |
        +----------------+ +----------------+ +----------------+
        
 ```
-
 ---
-
-## Структура проекта
-
-```plaintext
-.
-├── cmd
-│   └── main.go
-├── configs
-│   ├── config.go
-│   └── config.yaml
-├── docker-compose.yaml
-├── Dockerfile
-├── docs
-│   ├── docs.go
-│   ├── swagger.json
-│   └── swagger.yaml
-├── go.mod
-├── go.sum
-├── internal
-│   ├── api
-│   │   ├── handlers
-│   │   │   ├── AuthLogin.go
-│   │   │   ├── AuthRegister.go
-│   │   │   ├── status.go
-│   │   │   └── tasks.go
-│   │   ├── middleware
-│   │   │   ├── auth.go
-│   │   │   ├── CORSM.go
-│   │   │   └── logging.go
-│   │   └── routes.go
-│   ├── metrics
-│   ├── routes
-│   │   ├── auth.go
-│   │   └── tasks.go
-│   ├── tasks
-│   │   └── tasks.go
-│   ├── telegram
-│   ├── users
-│   │   └── auth.go
-│   └── worker
-│       └── worker.go
-├── Makefile
-├── pkg
-│   ├── encryption
-│   │   ├── encryption.go
-│   │   └── encryption_test.go
-│   ├── logger
-│   │   └── Zap.go
-│   ├── queue
-│   │   └── nats.go
-│   ├── response
-│   │   └── apiresponse.go
-│   └── storage
-│       ├── db
-│       │   └── conn.go
-│       └── models
-│           ├── AuthUser.go
-│           └── Tasks.go
-├── README.md
-└── test
-    ├── integration
-    └── unit
-
-25 directories, 33 files
-
 ```
-
+.
+├── cmd                     # Точка входа приложения
+│   └── main.go
+├── configs                 # Конфигурационные файлы
+│   ├── config.go
+│   └── config.yaml
+├── docker-compose.yaml     # Настройки Docker Compose
+├── Dockerfile              # Docker-образ
+├── docs                    # Документация Swagger
+│   ├── docs.go
+│   ├── swagger.json
+│   └── swagger.yaml
+├── internal                # Внутренняя логика микросервиса
+│   ├── api
+│   │   ├── handlers        # Обработчики маршрутов
+│   │   ├── middleware      # Middleware (аутентификация, логирование)
+│   │   └── routes.go       # Регистрация маршрутов
+│   ├── metrics             # Метрики Prometheus
+│   ├── tasks               # Бизнес-логика задач
+│   ├── telegram            # Работа с Telegram API
+│   ├── users               # Логика аутентификации
+│   └── worker              # Воркеры для обработки задач
+├── pkg                     # Общие библиотеки
+│   ├── encryption          # Шифрование
+│   ├── logger              # Логирование
+│   ├── queue               # Очереди NATS
+│   ├── response            # Форматирование API ответов
+│   └── storage             # Работа с базой данных
+├── README.md               # Документация проекта
+└── test                    # Тесты
+    ├── integration         # Интеграционные тесты
+    └── unit                # Юнит-тесты
+```
 ---
 
-## Эндпоинты API
-
+Эндпоинты API
 1. Регистрация пользователя
 
-POST /register
 Регистрация нового пользователя.
+
+Метод: POST /register
+
+    Тело запроса:
+
+{
+  "username": "example_user",
+  "password": "password123"
+}
+
+Ответ:
+
+    {
+      "success": true,
+      "data": {
+        "user_id": 1
+      }
+    }
+---
 2. Авторизация
 
-```
-POST /login
-```
+Получение токена access_token.
 
-Получение access_token.
+Метод: POST /login
 
+    Тело запроса:
+
+{
+  "username": "example_user",
+  "password": "password123"
+}
+
+Ответ:
+
+    {
+      "success": true,
+      "data": {
+        "access_token": "eyJhbGciOiJIUzI1..."
+      }
+    }
+---
 3. Создание задачи
 
-```
-POST /bulk_message
-```
+Создание задачи для массовой рассылки.
 
-Создание задачи для рассылки.
+Метод: POST /bulk_message
+
+    Тело запроса:
+
+{
+  "recipients": [123456789, 987654321],
+  "content": {
+    "type": "text",
+    "text": "Привет, это тестовое сообщение!"
+  },
+  "priority": "high"
+}
+
+Ответ:
+
+    {
+      "success": true,
+      "data": {
+        "task_id": "a804bd98-8e4d-4e8d-9678-7e28b7a8408f",
+        "status": "scheduled"
+      }
+    }
+---
 4. Проверка статуса задачи
 
-```
-GET /status/{task_id}
-```
+Получение информации о задаче.
 
-Проверка текущего статуса задачи.
+Метод: GET /status/{task_id}
+
+    Пример ответа:
+
+    {
+      "success": true,
+      "data": {
+        "task_id": "a804bd98-8e4d-4e8d-9678-7e28b7a8408f",
+        "status": "completed",
+        "recipients_count": 2
+      }
+    }
+---
 5. Отмена задачи
-
-```
-POST /cancel/{task_id}
-```
 
 Отмена задачи по ID.
 
----
+Метод: POST /cancel/{task_id}
+
+    Пример ответа:
+
+    {
+      "success": true,
+      "data": {
+        "task_id": "a804bd98-8e4d-4e8d-9678-7e28b7a8408f",
+        "status": "cancelled"
+      }
+    }
+
+Мониторинг
+
+    Метрики Prometheus: GET /metrics
+    Swagger UI: GET /swagger/index.html
+
