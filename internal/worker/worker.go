@@ -1,8 +1,8 @@
 package worker
 
 import (
-	"GoBlast/api/middleware"
 	"GoBlast/configs"
+	"GoBlast/internal/api/middleware"
 	"GoBlast/internal/tasks"
 	"GoBlast/internal/users"
 	"GoBlast/pkg/encryption"

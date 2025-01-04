@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"GoBlast/api/handlers"
+	"GoBlast/internal/api/handlers"
 	"github.com/gin-gonic/gin"
 )
 

@@ -1,21 +1,22 @@
 package handlers
 
 import (
-	"GoBlast/api/middleware"
+	"GoBlast/internal/api/middleware"
 	"GoBlast/internal/tasks"
+	"GoBlast/pkg/logger"
 	"GoBlast/pkg/queue"
 	"GoBlast/pkg/response"
 	"GoBlast/pkg/storage/models"
+	"fmt"
+	"go.uber.org/zap"
+	"time"
 
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"log"
 	"net/http"
-	"time"
 )
 
-// Content описывает содержимое задачи
 type Content struct {
 	Type     string `json:"type" binding:"required"` // text, photo, video, etc.
 	Text     string `json:"text,omitempty"`
@@ -23,7 +24,6 @@ type Content struct {
 	Caption  string `json:"caption,omitempty"`
 }
 
-// TaskRequest представляет запрос на создание задачи
 type TaskRequest struct {
 	Recipients []int64 `json:"recipients" binding:"required"` // Telegram Chat IDs
 	Content    Content `json:"content" binding:"required"`
@@ -31,7 +31,6 @@ type TaskRequest struct {
 	Schedule   string  `json:"schedule,omitempty"` // RFC3339
 }
 
-// TaskNATSMessage представляет сообщение для NATS
 type TaskNATSMessage struct {
 	TaskID     string  `json:"task_id"`
 	UserID     uint    `json:"user_id"`
@@ -52,11 +51,47 @@ func NewTaskHandler(repo *tasks.TasksRepository, natsClient *queue.NATSClient) *
 	return &TaskHandler{repo: repo, natsClient: natsClient}
 }
 
+func validateContent(content Content) error {
+	switch content.Type {
+	case "text":
+		if content.Text == "" {
+			return fmt.Errorf("text is required for type 'text'")
+		}
+	case "photo", "video", "animation":
+		if content.MediaURL == "" {
+			return fmt.Errorf("media_url is required for type '%s'", content.Type)
+		}
+	default:
+		return fmt.Errorf("invalid content type: %s", content.Type)
+	}
+	return nil
+}
+
+func validatePriority(priority string) error {
+	validPriorities := map[string]bool{"high": true, "medium": true, "low": true}
+	if priority != "" && !validPriorities[priority] {
+		return fmt.Errorf("invalid priority value: %s", priority)
+	}
+	return nil
+}
+
+func parseSchedule(schedule string) (*time.Time, error) {
+	if schedule == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, schedule)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
 // CreateTask Создаёт новую задачу
 // @Summary Создать задачу
 // @Description Создаёт новую задачу для отправки сообщений через Telegram.
 // @Tags Tasks
 // @Security BearerAuth
+// @securityDefinitions.apikey BearerAuth
 // @Accept json
 // @Produce json
 // @Param task body TaskRequest true "Создание задачи"
@@ -94,40 +129,38 @@ func NewTaskHandler(repo *tasks.TasksRepository, natsClient *queue.NATSClient) *
 func (h *TaskHandler) CreateTask(c *gin.Context) {
 	var req TaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("JSON Bind Error: %v\n", err)
+		logger.Log.Error("Ошибка привязки JSON", zap.Error(err))
 		c.JSON(http.StatusBadRequest, response.ErrorResponse("Invalid request payload"))
 		return
 	}
 
 	// Извлечение user_id из контекста
-	claimsInterface, exists := c.Get("claims")
+	claims, exists := c.Get("claims")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, response.ErrorResponse("Unauthorized: Missing claims in context"))
+		logger.Log.Error("Ошибка авторизации: claims отсутствуют в контексте")
+		c.JSON(http.StatusUnauthorized, response.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	claims, ok := claimsInterface.(*middleware.Claims)
+	userClaims, ok := claims.(*middleware.Claims)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, response.ErrorResponse("Unauthorized: Invalid claims format"))
+		logger.Log.Error("Ошибка авторизации: claims неверного формата")
+		c.JSON(http.StatusUnauthorized, response.ErrorResponse("Unauthorized"))
 		return
 	}
-
-	userID := claims.UserID
+	userID := userClaims.UserID
 
 	// Проверяем тип контента
-	switch req.Content.Type {
-	case "text":
-		if req.Content.Text == "" {
-			c.JSON(http.StatusBadRequest, response.ErrorResponse("Text required for type='text'"))
-			return
-		}
-	case "photo", "video", "animation":
-		if req.Content.MediaURL == "" {
-			c.JSON(http.StatusBadRequest, response.ErrorResponse("Media URL required for this type"))
-			return
-		}
-	default:
-		c.JSON(http.StatusBadRequest, response.ErrorResponse("Invalid content type"))
+	if err := validateContent(req.Content); err != nil {
+		logger.Log.Error("Ошибка валидации контента", zap.Error(err))
+		c.JSON(http.StatusBadRequest, response.ErrorResponse(err.Error()))
+		return
+	}
+
+	// Проверяем Priority
+	if err := validatePriority(req.Priority); err != nil {
+		logger.Log.Error("Ошибка валидации приоритета", zap.Error(err))
+		c.JSON(http.StatusBadRequest, response.ErrorResponse(err.Error()))
 		return
 	}
 
@@ -135,19 +168,17 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 	taskID := uuid.New().String()
 
 	// Парсим schedule
-	var schedule *time.Time
-	if req.Schedule != "" {
-		parsed, err := time.Parse(time.RFC3339, req.Schedule)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, response.ErrorResponse("Invalid schedule format"))
-			return
-		}
-		schedule = &parsed
+	schedule, err := parseSchedule(req.Schedule)
+	if err != nil {
+		logger.Log.Error("Ошибка парсинга расписания", zap.Error(err))
+		c.JSON(http.StatusBadRequest, response.ErrorResponse("Invalid schedule format"))
+		return
 	}
 
-	// Сериализуем Content в JSON (хранить в БД)
+	// Сериализуем Content в JSON (для БД)
 	contentJSON, err := json.Marshal(req.Content)
 	if err != nil {
+		logger.Log.Error("Ошибка сериализации контента", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, response.ErrorResponse("Failed to serialize content"))
 		return
 	}
@@ -155,9 +186,9 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 	// Создаём модель задачи
 	task := &models.Task{
 		ID:          taskID,
-		UserID:      userID, // Используем userID из claims
+		UserID:      userID,
 		MessageType: req.Content.Type,
-		Content:     string(contentJSON), // для БД
+		Content:     string(contentJSON),
 		Priority:    req.Priority,
 		Schedule:    schedule,
 		Status:      "scheduled",
@@ -165,7 +196,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 
 	// Сохраняем в БД
 	if err := h.repo.SaveTask(task); err != nil {
-		log.Printf("Error saving task: %v\n", err)
+		logger.Log.Error("Ошибка сохранения задачи в БД", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, response.ErrorResponse("Failed to save task"))
 		return
 	}
@@ -173,22 +204,30 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 	// Формируем сообщение для NATS
 	msg := TaskNATSMessage{
 		TaskID:     taskID,
-		UserID:     userID, // Используем userID из claims
+		UserID:     userID,
 		Recipients: req.Recipients,
 		Content:    req.Content,
 		Priority:   req.Priority,
 	}
 	payload, err := json.Marshal(msg)
 	if err != nil {
+		logger.Log.Error("Ошибка сериализации сообщения для NATS", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, response.ErrorResponse("Failed to marshal NATS message"))
 		return
 	}
 
 	// Публикуем в NATS
 	if err := h.natsClient.Conn.Publish("tasks.create", payload); err != nil {
+		logger.Log.Error("Ошибка публикации в NATS", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, response.ErrorResponse("Failed to publish to NATS"))
 		return
 	}
+
+	logger.Log.Info("Задача успешно создана",
+		zap.String("task_id", taskID),
+		zap.String("user_id", fmt.Sprintf("%d", userID)),
+		zap.String("priority", req.Priority),
+	)
 
 	// Возвращаем результат
 	c.JSON(http.StatusCreated, response.SuccessResponse(map[string]interface{}{
@@ -200,6 +239,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 // GetTask Возвращает задачу по ID
 // @Summary Получить задачу
 // @Description Возвращает детали задачи по её ID
+// @securityDefinitions.apikey BearerAuth
 // @Tags Tasks
 // @Security BearerAuth
 // @Accept json

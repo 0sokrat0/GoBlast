@@ -4,8 +4,8 @@ package middleware
 
 import (
 	"GoBlast/configs"
+	"GoBlast/pkg/response"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -27,7 +27,6 @@ func Initialize(cfg *configs.Config) {
 	}
 
 	EncryptionKey = cfg.Encricrypted.EncryptionKey
-	log.Printf("EncryptionKey length: %d", len(EncryptionKey))
 
 }
 
@@ -37,13 +36,12 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
-// JWTMiddleware проверяет JWT-токен и устанавливает claims в контекст
 func JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Получаем заголовок Authorization
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			c.JSON(http.StatusUnauthorized, response.ErrorResponse("Authorization header required"))
 			c.Abort()
 			return
 		}
@@ -62,7 +60,7 @@ func JWTMiddleware() gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.JSON(http.StatusUnauthorized, response.ErrorResponse("Invalid token"))
 			c.Abort()
 			return
 		}

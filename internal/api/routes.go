@@ -1,8 +1,8 @@
 package api
 
 import (
-	"GoBlast/api/handlers"
-	"GoBlast/api/middleware"
+	handlers2 "GoBlast/internal/api/handlers"
+	middleware2 "GoBlast/internal/api/middleware"
 	"GoBlast/internal/routes"
 	"GoBlast/internal/tasks"
 	"GoBlast/internal/users"
@@ -20,8 +20,8 @@ func SetupRouter(database *gorm.DB, natsClient *queue.NATSClient) *gin.Engine {
 	router := gin.Default()
 
 	// Middleware
-	router.Use(middleware.RequestLogger())
-	router.Use(middleware.CORSMiddleware())
+	router.Use(middleware2.RequestLogger())
+	router.Use(middleware2.CORSMiddleware())
 
 	// Swagger
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -35,11 +35,11 @@ func SetupRouter(database *gorm.DB, natsClient *queue.NATSClient) *gin.Engine {
 
 	// Repositories
 	authRepo := users.NewAuthUserRepository(database)
-	taskRepo := tasks.NewTasksRepository(database) // БЕЗ второго аргумента
+	taskRepo := tasks.NewTasksRepository(database)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authRepo)
-	taskHandler := handlers.NewTaskHandler(taskRepo, natsClient) // ДВА аргумента
+	authHandler := handlers2.NewAuthHandler(authRepo)
+	taskHandler := handlers2.NewTaskHandler(taskRepo, natsClient)
 
 	api := router.Group("/api")
 	{
@@ -47,7 +47,7 @@ func SetupRouter(database *gorm.DB, natsClient *queue.NATSClient) *gin.Engine {
 	}
 
 	protected := router.Group("/api")
-	protected.Use(middleware.JWTMiddleware())
+	protected.Use(middleware2.JWTMiddleware())
 	{
 		routes.SetupTaskRoutes(protected, taskHandler)
 	}

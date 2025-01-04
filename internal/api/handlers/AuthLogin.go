@@ -3,11 +3,11 @@
 package handlers
 
 import (
+	"GoBlast/internal/api/middleware"
 	"encoding/base64"
 	"log"
 	"net/http"
 
-	"GoBlast/api/middleware"
 	"GoBlast/pkg/encryption"
 	"GoBlast/pkg/response"
 	"github.com/gin-gonic/gin"

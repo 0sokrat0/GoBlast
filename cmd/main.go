@@ -1,9 +1,9 @@
 package main
 
 import (
-	"GoBlast/api"
-	"GoBlast/api/middleware"
 	"GoBlast/configs"
+	"GoBlast/internal/api"
+	"GoBlast/internal/api/middleware"
 	"GoBlast/internal/worker"
 	"GoBlast/pkg/logger"
 	"GoBlast/pkg/queue"
@@ -19,13 +19,25 @@ import (
 	_ "GoBlast/docs"
 )
 
+// @title GoBlast API
+// @version 1.0
+// @description API для управления рассылками с поддержкой JWT аутентификации.
+// @termsOfService http://example.com/terms/
+// @contact.name API Support
+// @contact.email support@example.com
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+// @host localhost:8080
+// @BasePath /api
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description "Введите JWT токен в формате: Bearer {your-token}"
 func main() {
-	// Инициализация логгера
 	env := os.Getenv("APP_ENV")
 	if env == "" {
-		env = "production" // Значение по умолчанию
+		env = "production"
 	}
-
 	if err := logger.InitLogger(env); err != nil {
 		fmt.Printf("Не удалось инициализировать логгер: %v\n", err)
 		os.Exit(1)

@@ -10,11 +10,9 @@ var Log *zap.Logger // Глобальный логгер
 func InitLogger(env string) error {
 	var config zap.Config
 	if env == "development" {
-		// Цветной вывод для разработки
 		config = zap.NewDevelopmentConfig()
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	} else {
-		// Чистый JSON для production
 		config = zap.NewProductionConfig()
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	}
@@ -36,6 +34,6 @@ func InitLogger(env string) error {
 
 func SyncLogger() {
 	if Log != nil {
-		_ = Log.Sync() // Синхронизация логов
+		_ = Log.Sync()
 	}
 }
