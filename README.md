@@ -3,6 +3,8 @@
 [![GitHub](https://img.shields.io/badge/GoBlast-GitHub-blue?logo=github)](https://github.com/0sokrat0/GoBlast)
 [![Telegram](https://img.shields.io/badge/GoBlast-Telegram-blue?logo=telegram)](https://t.me/SOKRAT_00)
 
+
+
 ![GoBlast](https://blog.jetbrains.com/wp-content/uploads/2021/02/Go_8001611039611515.gif)
 
 **GoBlast** — это микросервис для массовой рассылки сообщений через Telegram с использованием **NATS** для очередей и **Redis** для дедупликации. Проект построен на основе **Standard Go Project Layout** и поддерживает многопользовательскую работу с приоритетами и мониторингом.
