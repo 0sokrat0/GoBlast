@@ -41,13 +41,11 @@ func SetupRouter(database *gorm.DB, natsClient *queue.NATSClient) *gin.Engine {
 	authHandler := handlers.NewAuthHandler(authRepo)
 	taskHandler := handlers.NewTaskHandler(taskRepo, natsClient) // ДВА аргумента
 
-	// Public API routes
 	api := router.Group("/api")
 	{
 		routes.SetupAuthRoutes(api, authHandler)
 	}
 
-	// Protected API routes
 	protected := router.Group("/api")
 	protected.Use(middleware.JWTMiddleware())
 	{

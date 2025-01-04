@@ -31,3 +31,17 @@ func (r *TasksRepository) GetTaskByID(id string) (*models.Task, error) {
 
 	return &task, err
 }
+
+func (r *TasksRepository) UpdateStatus(taskID string, newStatus string) error {
+
+	var t models.Task
+	if err := r.db.First(&t, "id = ?", taskID).Error; err != nil {
+		return err
+	}
+
+	// Меняем статус
+	t.Status = newStatus
+
+	// Сохраняем
+	return r.db.Save(&t).Error
+}

@@ -1,76 +1,106 @@
+// pkg/middleware/middleware.go
+
 package middleware
 
 import (
 	"GoBlast/configs"
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
-	"golang.org/x/crypto/bcrypt"
 )
 
+var (
+	JWTSecret     string
+	EncryptionKey string
+)
+
+// Initialize инициализирует ключи из конфигурации
+func Initialize(cfg *configs.Config) {
+	JWTSecret = cfg.App.JWTSecret
+	if JWTSecret == "" {
+		panic("JWTSecret must be set")
+	}
+
+	EncryptionKey = cfg.Encricrypted.EncryptionKey
+	log.Printf("EncryptionKey length: %d", len(EncryptionKey))
+
+}
+
+// Claims представляет структуру JWT-токена
 type Claims struct {
 	UserID uint `json:"user_id"`
 	jwt.StandardClaims
 }
 
+// JWTMiddleware проверяет JWT-токен и устанавливает claims в контекст
 func JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Получаем заголовок Authorization
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
 			c.Abort()
 			return
 		}
 
+		// Извлекаем токен из заголовка
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		claims, err := ValidateToken(tokenString)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+
+		// Парсим токен
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			// Проверяем метод подписи
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method")
+			}
+			return []byte(JWTSecret), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
 		}
 
-		c.Set("user_id", claims.UserID)
+		// Устанавливаем claims в контекст
+		c.Set("claims", claims)
 		c.Next()
 	}
 }
 
-func HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(hash), err
-}
-
-func CheckPassword(hash, password string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
-}
-
+// GenerateToken генерирует JWT-токен для заданного userID
 func GenerateToken(userID uint) (string, error) {
-	claims := Claims{
+	claims := &Claims{
 		UserID: userID,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour * 24).Unix(),
+			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(), // Токен истекает через 24 часа
 			IssuedAt:  time.Now().Unix(),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(configs.AppConfigInstance.App.JWTSecret))
+	return token.SignedString([]byte(JWTSecret))
 }
 
+// ValidateToken валидирует JWT-токен и возвращает claims
 func ValidateToken(tokenString string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(configs.AppConfigInstance.App.JWTSecret), nil
-	})
-	if err != nil {
-		return nil, err
-	}
+	claims := &Claims{}
 
-	claims, ok := token.Claims.(*Claims)
-	if !ok || !token.Valid {
-		return nil, jwt.ErrSignatureInvalid
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		// Проверяем метод подписи
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(JWTSecret), nil
+	})
+
+	if err != nil || !token.Valid {
+		return nil, fmt.Errorf("invalid token")
 	}
 
 	return claims, nil

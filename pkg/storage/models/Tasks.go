@@ -7,7 +7,7 @@ import (
 )
 
 type Task struct {
-	ID          string         `gorm:"type:uuid;primaryKey"`
+	ID          string         `gorm:"primaryKey"`
 	UserID      uint           `gorm:"not null"`
 	MessageType string         `gorm:"type:varchar(20);not null"`
 	Content     string         `gorm:"type:jsonb;not null"`
