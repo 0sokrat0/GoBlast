@@ -1,0 +1,19 @@
+app:
+  name: "GoBlast"
+  environment: "development"
+  port: 8080
+  jwt_secret: "GoBlast"
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: 3215
+  name: goblast
+
+broker:
+  url: nats://localhost:4222
+
+
+encrypted:
+  encryption_key: "12345678901234567890123456789012"

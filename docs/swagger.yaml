@@ -1,0 +1,264 @@
+basePath: /api
+definitions:
+  GoBlast_pkg_response.APIResponse:
+    properties:
+      data: {}
+      error:
+        type: string
+      success:
+        type: boolean
+    type: object
+  GoBlast_pkg_storage_models.Task:
+    properties:
+      content:
+        type: string
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      id:
+        type: string
+      messageType:
+        type: string
+      priority:
+        type: string
+      schedule:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
+      userID:
+        type: integer
+    type: object
+  gorm.DeletedAt:
+    properties:
+      time:
+        type: string
+      valid:
+        description: Valid is true if Time is not NULL
+        type: boolean
+    type: object
+  internal_api_handlers.Content:
+    properties:
+      caption:
+        type: string
+      media_url:
+        type: string
+      text:
+        type: string
+      type:
+        description: text, photo, video, etc.
+        type: string
+    required:
+    - type
+    type: object
+  internal_api_handlers.LoginInput:
+    properties:
+      token:
+        type: string
+      username:
+        type: string
+    required:
+    - token
+    - username
+    type: object
+  internal_api_handlers.RegisterInput:
+    properties:
+      token:
+        type: string
+      username:
+        type: string
+    required:
+    - token
+    - username
+    type: object
+  internal_api_handlers.TaskRequest:
+    properties:
+      content:
+        $ref: '#/definitions/internal_api_handlers.Content'
+      priority:
+        description: high, medium, low
+        type: string
+      recipients:
+        description: Telegram Chat IDs
+        items:
+          type: integer
+        type: array
+      schedule:
+        description: RFC3339
+        type: string
+    required:
+    - content
+    - recipients
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+  description: API для управления рассылками с поддержкой JWT аутентификации.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://example.com/terms/
+  title: GoBlast API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates the user and returns a JWT token
+      parameters:
+      - description: User credentials (username and token)
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.LoginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWT token
+          schema:
+            allOf:
+            - $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "500":
+          description: Failed to generate token
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+      tags:
+      - Authentication
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Создаёт новый аккаунт пользователя с уникальным именем и Telegram
+        Bot Token.
+      parameters:
+      - description: User registration data
+        in: body
+        name: register
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.RegisterInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Пользователь успешно зарегистрирован
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "400":
+          description: Некорректные входные данные
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "409":
+          description: Имя пользователя уже существует
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+      tags:
+      - Authentication
+  /tasks:
+    post:
+      consumes:
+      - application/json
+      description: Создаёт новую задачу для отправки сообщений через Telegram.
+      parameters:
+      - description: Создание задачи
+        in: body
+        name: task
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.TaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Задача успешно создана
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "400":
+          description: Некорректные входные данные
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "401":
+          description: Неавторизованный доступ
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Создать задачу
+      tags:
+      - Tasks
+  /tasks/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает детали задачи по её ID
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Детали задачи
+          schema:
+            allOf:
+            - $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/GoBlast_pkg_storage_models.Task'
+              type: object
+        "401":
+          description: Неавторизованный доступ
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "404":
+          description: Задача не найдена
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/GoBlast_pkg_response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить задачу
+      tags:
+      - Tasks
+securityDefinitions:
+  BearerAuth:
+    description: '"Введите JWT токен в формате: Bearer {your-token}"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

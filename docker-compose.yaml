@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    container_name: goblast_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 3215       # Пароль должен совпадать с config.yaml
+      POSTGRES_DB: goblast
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2.9.2           # Или более свежая версия
+    container_name: goblast_nats
+    restart: always
+    ports:
+      - "4222:4222"             # Основной порт NATS
+      - "8222:8222"             # HTTP-порт для мониторинга (по желанию)
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:8222/varz || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: goblast_api
+  #   restart: always
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - DATABASE_HOST=db
+  #     - DATABASE_PORT=5432
+  #     - DATABASE_USER=postgres
+  #     - DATABASE_PASSWORD=3215       # Должен совпадать с POSTGRES_PASSWORD
+  #     - DATABASE_NAME=goblast
+  #     - JWT_SECRET=GoBlast
+  #     - NATS_URL=nats://nats:4222
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     nats:
+  #       condition: service_healthy
+
+volumes:
+  db_data:
