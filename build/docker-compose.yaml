@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    container_name: db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 3215       # Пароль должен совпадать с config.yaml
+      POSTGRES_DB: goblast
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2.10.24
+    container_name: goblast_nats
+    restart: always
+    ports:
+      - "4222:4222"
+      - "8222:8222"             # HTTP-порт для мониторинга
+    # Убираем проверку healthcheck для NATS
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]  # Всегда возвращает успешное состояние
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    environment:
+      - PROMETHEUS_STORAGE_PATH=/prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_SERVER_HTTP_PORT=3000
+    ports:
+      - "3000:3000"
+
+  api:
+    build:
+      context: ..
+      dockerfile: build/go/Dockerfile
+    container_name: goblast_api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=3215       # Должен совпадать с POSTGRES_PASSWORD
+      - DATABASE_NAME=goblast
+      - JWT_SECRET=GoBlast
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      db:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    command: >
+      /bin/sh -c "sleep 10 && ./goblast"  # Задержка в 10 секунд перед запуском
+
+  prometheus-nats-exporter:
+    image: natsio/prometheus-nats-exporter:latest
+    command: "-connz -varz -channelz -serverz -subz -healthz -routez http://goblast_nats:8222"
+    ports:
+      - "7777:7777"  # Измените внешний порт
+
+
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    restart: always
+    ports:
+      - "9100:9100"
+
+volumes:
+  db_data:

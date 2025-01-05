@@ -1,9 +1,10 @@
+
 # **Микросервис рассылки сообщений для Telegram**
 
 [![GitHub](https://img.shields.io/badge/GoBlast-GitHub-blue?logo=github)](https://github.com/0sokrat0/GoBlast)
 [![Telegram](https://img.shields.io/badge/GoBlast-Telegram-blue?logo=telegram)](https://t.me/SOKRAT_00)
-
-
+[![Prometheus](https://img.shields.io/badge/Monitoring-Prometheus-orange?logo=prometheus)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/Dashboards-Grafana-green?logo=grafana)](https://grafana.com/)
 
 ![GoBlast](https://blog.jetbrains.com/wp-content/uploads/2021/02/Go_8001611039611515.gif)
 
@@ -14,19 +15,19 @@
 ## **Основной функционал**
 
 1. **Поддержка всех типов сообщений**:
-    - Текст (`text`)
-    - Фото (`photo`)
-    - Видео (`video`)
-    - Голосовые сообщения (`voice`)
-    - Анимации (`animation`)
-    - Документы (`document`)
+    - Текст (text)
+    - Фото (photo)
+    - Видео (video)
+    - Голосовые сообщения (voice)
+    - Анимации (animation)
+    - Документы (document)
 
 2. **Многопользовательская поддержка**:
-    - Авторизация через `access_token`.
+    - Авторизация через access_token.
     - Изоляция задач между пользователями.
 
 3. **Регулируемая скорость**:
-    - Поддержка приоритетов (`high`, `medium`, `low`) для оптимальной нагрузки.
+    - Поддержка приоритетов (high, medium, low) для оптимальной нагрузки.
 
 4. **Дедупликация сообщений**:
     - Проверка уникальности сообщений с использованием Redis.
@@ -63,152 +64,56 @@
        +----------------+ +----------------+ +----------------+
        | Telegram API   | |  Redis / DB     | |   Логирование  |
        +----------------+ +----------------+ +----------------+
-       
 ```
----
-```
-.
-├── cmd                     # Точка входа приложения
-│   └── main.go
-├── configs                 # Конфигурационные файлы
-│   ├── config.go
-│   └── config.yaml
-├── docker-compose.yaml     # Настройки Docker Compose
-├── Dockerfile              # Docker-образ
-├── docs                    # Документация Swagger
-│   ├── docs.go
-│   ├── swagger.json
-│   └── swagger.yaml
-├── internal                # Внутренняя логика микросервиса
-│   ├── api
-│   │   ├── handlers        # Обработчики маршрутов
-│   │   ├── middleware      # Middleware (аутентификация, логирование)
-│   │   └── routes.go       # Регистрация маршрутов
-│   ├── metrics             # Метрики Prometheus
-│   ├── tasks               # Бизнес-логика задач
-│   ├── telegram            # Работа с Telegram API
-│   ├── users               # Логика аутентификации
-│   └── worker              # Воркеры для обработки задач
-├── pkg                     # Общие библиотеки
-│   ├── encryption          # Шифрование
-│   ├── logger              # Логирование
-│   ├── queue               # Очереди NATS
-│   ├── response            # Форматирование API ответов
-│   └── storage             # Работа с базой данных
-├── README.md               # Документация проекта
-└── test                    # Тесты
-    ├── integration         # Интеграционные тесты
-    └── unit                # Юнит-тесты
-```
+
 ---
 
-Эндпоинты API
-1. Регистрация пользователя
+## **Установка и запуск**
 
-Регистрация нового пользователя.
+### **Системные требования**
 
-Метод: POST /register
+- **Go**: >=1.20
+- **Docker**: >=20.10
+- **Redis**
+- **NATS**
+- **Prometheus** и **Grafana**
 
-    Тело запроса:
+### **Запуск проекта**
 
-{
-  "username": "example_user",
-  "password": "password123"
-}
+1. Клонировать репозиторий:
+    ```bash
+    git clone https://github.com/0sokrat0/GoBlast.git
+    cd GoBlast
+    ```
 
-Ответ:
+2. Запустить проект через Docker Compose:
+    ```bash
+    docker-compose up --build
+    ```
 
-    {
-      "success": true,
-      "data": {
-        "user_id": 1
-      }
-    }
+3. Открыть метрики и дашборды:
+    - **Prometheus**: [http://localhost:9090](http://localhost:9090)
+    - **Grafana**: [http://localhost:3000](http://localhost:3000)
+
 ---
-2. Авторизация
 
-Получение токена access_token.
+## **API Документация**
 
-Метод: POST /login
+Документация доступна в формате Swagger:
+- URL: [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
 
-    Тело запроса:
-
-{
-  "username": "example_user",
-  "password": "password123"
-}
-
-Ответ:
-
-    {
-      "success": true,
-      "data": {
-        "access_token": "eyJhbGciOiJIUzI1..."
-      }
-    }
 ---
-3. Создание задачи
 
-Создание задачи для массовой рассылки.
+## **Мониторинг**
 
-Метод: POST /bulk_message
+В проект включены метрики Prometheus:
+- HTTP запросы: `/metrics`
+- Мониторинг Telegram-воркеров и задач
+- Grafana дашборды для визуализации.
 
-    Тело запроса:
-
-{
-  "recipients": [123456789, 987654321],
-  "content": {
-    "type": "text",
-    "text": "Привет, это тестовое сообщение!"
-  },
-  "priority": "high"
-}
-
-Ответ:
-
-    {
-      "success": true,
-      "data": {
-        "task_id": "a804bd98-8e4d-4e8d-9678-7e28b7a8408f",
-        "status": "scheduled"
-      }
-    }
 ---
-4. Проверка статуса задачи
 
-Получение информации о задаче.
+## **Контакты**
 
-Метод: GET /status/{task_id}
-
-    Пример ответа:
-
-    {
-      "success": true,
-      "data": {
-        "task_id": "a804bd98-8e4d-4e8d-9678-7e28b7a8408f",
-        "status": "completed",
-        "recipients_count": 2
-      }
-    }
----
-5. Отмена задачи
-
-Отмена задачи по ID.
-
-Метод: POST /cancel/{task_id}
-
-    Пример ответа:
-
-    {
-      "success": true,
-      "data": {
-        "task_id": "a804bd98-8e4d-4e8d-9678-7e28b7a8408f",
-        "status": "cancelled"
-      }
-    }
-
-Мониторинг
-
-    Метрики Prometheus: GET /metrics
-    Swagger UI: GET /swagger/index.html
-
+- Telegram: [@SOKRAT_00](https://t.me/SOKRAT_00)
+- GitHub: [0sokrat0](https://github.com/0sokrat0)
