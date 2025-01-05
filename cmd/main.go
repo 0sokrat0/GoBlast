@@ -6,15 +6,19 @@ import (
 	"GoBlast/internal/api/middleware"
 	"GoBlast/internal/worker"
 	"GoBlast/pkg/logger"
+	"GoBlast/pkg/metrics"
 	"GoBlast/pkg/queue"
 	"GoBlast/pkg/storage/db"
 	"context"
 	"fmt"
-	"go.uber.org/zap"
-	"gorm.io/gorm"
+	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	_ "GoBlast/docs"
 )
@@ -44,11 +48,9 @@ func main() {
 	}
 	defer logger.SyncLogger()
 
-	// Обработка сигналов
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Инициализация конфигурации
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
 		configPath = "./configs"
@@ -63,7 +65,6 @@ func main() {
 		zap.Int("port", cfg.App.Port),
 	)
 
-	// Инициализация базы данных
 	dbConn := initDB(cfg)
 	defer func() {
 		sqlDB, err := dbConn.DB()
@@ -76,18 +77,16 @@ func main() {
 		}
 	}()
 
-	// Инициализация NATS
 	natsClient := initQueue(cfg)
 	defer func() {
 		natsClient.Conn.Close()
 		logger.Log.Info("Соединение с NATS закрыто")
 	}()
 
-	// Инициализация middleware
 	middleware.Initialize(cfg)
 
-	// Запуск сервера и воркера
 	go startServer(ctx, cfg, dbConn, natsClient)
+	go startMetrics(ctx)
 	startWorker(ctx, cfg, dbConn, natsClient)
 
 	logger.Log.Info("Программа завершена")
@@ -136,4 +135,17 @@ func startWorker(ctx context.Context, cfg *configs.Config, db *gorm.DB, natsClie
 
 	<-ctx.Done()
 	logger.Log.Info("Воркер завершает работу...")
+}
+
+func startMetrics(ctx context.Context) {
+	metrics.InitMetrics()
+	metrics.RegisterMetricsEndpoint()
+
+	go func() {
+		logger.Log.Info("Metrics endpoint available at /metrics")
+		log.Fatal(http.ListenAndServe(":9090", nil))
+	}()
+
+	<-ctx.Done()
+	logger.Log.Info("Метрики завершают работу...")
 }

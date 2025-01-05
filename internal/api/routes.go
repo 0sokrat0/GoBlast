@@ -6,6 +6,7 @@ import (
 	"GoBlast/internal/routes"
 	"GoBlast/internal/tasks"
 	"GoBlast/internal/users"
+	"GoBlast/pkg/metrics"
 	"GoBlast/pkg/queue"
 	"net/http"
 
@@ -16,8 +17,11 @@ import (
 )
 
 func SetupRouter(database *gorm.DB, natsClient *queue.NATSClient) *gin.Engine {
+	metrics.InitMetrics()
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
+
+	router.GET("/metrics", gin.WrapH(metrics.MetricsHandler()))
 
 	// Middleware
 	router.Use(middleware2.RequestLogger())

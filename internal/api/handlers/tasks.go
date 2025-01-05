@@ -4,17 +4,20 @@ import (
 	"GoBlast/internal/api/middleware"
 	"GoBlast/internal/tasks"
 	"GoBlast/pkg/logger"
+	"GoBlast/pkg/metrics"
 	"GoBlast/pkg/queue"
 	"GoBlast/pkg/response"
 	"GoBlast/pkg/storage/models"
 	"fmt"
-	"go.uber.org/zap"
 	"time"
 
+	"go.uber.org/zap"
+
 	"encoding/json"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"net/http"
 )
 
 type Content struct {
@@ -127,9 +130,11 @@ func parseSchedule(schedule string) (*time.Time, error) {
 //
 // */
 func (h *TaskHandler) CreateTask(c *gin.Context) {
+	start := time.Now()
 	var req TaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		logger.Log.Error("Ошибка привязки JSON", zap.Error(err))
+		metrics.TaskFailedCounter.Inc()
 		c.JSON(http.StatusBadRequest, response.ErrorResponse("Invalid request payload"))
 		return
 	}
@@ -228,6 +233,9 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		zap.String("user_id", fmt.Sprintf("%d", userID)),
 		zap.String("priority", req.Priority),
 	)
+
+	metrics.TaskCreatedCounter.Inc()
+	metrics.TaskProcessingDuration.WithLabelValues("telegram").Observe(time.Since(start).Seconds())
 
 	// Возвращаем результат
 	c.JSON(http.StatusCreated, response.SuccessResponse(map[string]interface{}{

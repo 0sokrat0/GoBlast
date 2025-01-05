@@ -5,14 +5,16 @@ app:
   jwt_secret: "GoBlast"
 
 database:
-  host: localhost
+  host: db
   port: 5432
   user: postgres
   password: 3215
   name: goblast
+  sslmode: disable # Или другой режим, если требуется
+
 
 broker:
-  url: nats://localhost:4222
+  url: nats://goblast_nats:4222
 
 
 encrypted:
