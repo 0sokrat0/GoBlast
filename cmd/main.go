@@ -87,7 +87,7 @@ func main() {
 
 	go startServer(ctx, cfg, dbConn, natsClient)
 	go startMetrics(ctx)
-	startWorker(ctx, cfg, dbConn, natsClient)
+	startWorker(ctx, dbConn, natsClient)
 
 	logger.Log.Info("Программа завершена")
 }
@@ -105,7 +105,10 @@ func initDB(cfg *configs.Config) *gorm.DB {
 func initQueue(cfg *configs.Config) *queue.NATSClient {
 	client, err := queue.NewNatsClient(cfg.Broker.URL)
 	if err != nil {
-		logger.Log.Fatal("Ошибка подключения к NATS", zap.Error(err)) // Завершаем выполнение
+		logger.Log.Fatal("Ошибка подключения к NATS", zap.Error(err))
+	}
+	if !client.Conn.IsConnected() {
+		logger.Log.Fatal("Соединение с NATS не установлено")
 	}
 	logger.Log.Info("Соединение с NATS установлено", zap.String("url", cfg.Broker.URL))
 	return client
@@ -125,16 +128,25 @@ func startServer(ctx context.Context, cfg *configs.Config, db *gorm.DB, natsClie
 	logger.Log.Info("Сервер завершает работу...")
 }
 
-func startWorker(ctx context.Context, cfg *configs.Config, db *gorm.DB, natsClient *queue.NATSClient) {
+func startWorker(ctx context.Context, db *gorm.DB, natsClient *queue.NATSClient) {
+	// Инициализация BotManager
+	botManager := worker.NewBotManager()
+
 	go func() {
 		logger.Log.Info("Воркер запущен")
-		if err := worker.Worker(cfg, db, natsClient); err != nil {
-			logger.Log.Error("Ошибка в воркере", zap.Error(err))
+		// Подписка на задачи
+		if err := worker.SubscribeTasks(natsClient, db, botManager); err != nil {
+			logger.Log.Error("Ошибка подписки на задачи", zap.Error(err))
+			return
 		}
+		logger.Log.Info("Подписка на задачи выполнена")
 	}()
 
+	// Ожидаем завершения контекста
 	<-ctx.Done()
-	logger.Log.Info("Воркер завершает работу...")
+
+	// После завершения контекста завершаем работу воркера
+	logger.Log.Info("Завершаем работу воркера...")
 }
 
 func startMetrics(ctx context.Context) {
