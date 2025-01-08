@@ -3,7 +3,6 @@ package tasks
 import (
 	"GoBlast/pkg/storage/models"
 	"errors"
-
 	"gorm.io/gorm"
 )
 
@@ -33,15 +32,15 @@ func (r *TasksRepository) GetTaskByID(id string) (*models.Task, error) {
 }
 
 func (r *TasksRepository) UpdateStatus(taskID string, newStatus string) error {
-
+	// Ищем задачу
 	var t models.Task
 	if err := r.db.First(&t, "id = ?", taskID).Error; err != nil {
 		return err
 	}
 
-	// Меняем статус
+	// Обновляем статус
 	t.Status = newStatus
 
-	// Сохраняем
+	// Сохраняем изменения
 	return r.db.Save(&t).Error
 }

@@ -1,0 +1,11 @@
+{
+  "recipients": [
+    575225733
+  ],
+  "content": {
+    "type": "photo",
+    "media_url": "https://archlinux.org/img/devs/99bdd6fccf9f0b4e17e2327e746f5e682149d570.png",
+    "caption": "<b>Привет, это нагрузочное тестирование bombardier!</b>"
+  },
+  "priority": "high"
+}

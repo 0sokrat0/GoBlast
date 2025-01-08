@@ -67,7 +67,7 @@ func SubscribeTasks(natsClient *queue.NATSClient, db *gorm.DB, botManager *BotMa
 		}
 
 		// Передаем задачу в BotManager
-		botManager.StartTask(botToken, natsMsg)
+		botManager.StartTask(botToken, natsMsg, db)
 	})
 
 	if err != nil {
