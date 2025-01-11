@@ -21,10 +21,11 @@ import (
 )
 
 type Content struct {
-	Type     string `json:"type" binding:"required"` // text, photo, video, etc.
-	Text     string `json:"text,omitempty"`
-	MediaURL string `json:"media_url,omitempty"`
-	Caption  string `json:"caption,omitempty"`
+	Type     string `json:"type"`      // "text", "photo", "video", ...
+	Text     string `json:"text"`      // если type="text"
+	MediaURL string `json:"media_url"` // если передается URL
+	MediaID  string `json:"media_id"`  // если передается media_id
+	Caption  string `json:"caption"`   // подпись
 }
 
 type TaskRequest struct {
@@ -60,9 +61,9 @@ func validateContent(content Content) error {
 		if content.Text == "" {
 			return fmt.Errorf("text is required for type 'text'")
 		}
-	case "photo", "video", "animation":
-		if content.MediaURL == "" {
-			return fmt.Errorf("media_url is required for type '%s'", content.Type)
+	case "photo", "video", "animation", "audio", "circle", "document":
+		if content.MediaURL == "" && content.MediaID == "" {
+			return fmt.Errorf("either media_url or media_id is required for type '%s'", content.Type)
 		}
 	default:
 		return fmt.Errorf("invalid content type: %s", content.Type)

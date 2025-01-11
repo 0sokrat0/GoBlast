@@ -185,7 +185,7 @@
   "priority": "high"
 }
 
- bombardier -c 100 -n 100 -m POST -f task.json -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJleHAiOjE3MzY0NjQzMjUsImlhdCI6MTczNjM3NzkyNX0.5Zg6gYx1lhCiYkSOItgpvGPLwwbav9y1EOeIOVLwiNs" http://localhost:8080/api/tasks
+ bombardier -c 100 -n 100 -m POST -f task.json -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJleHAiOjE3MzY3MDE1MzYsImlhdCI6MTczNjYxNTEzNn0.WoN7tJ3fD1WgnYB0ktDWBFfD2DzCOSD7sFLmqBxi87Q" http://localhost:8080/api/tasks
 
 
 

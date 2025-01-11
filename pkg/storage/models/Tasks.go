@@ -17,4 +17,6 @@ type Task struct {
 	CreatedAt   time.Time      `gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime"`
 	DeletedAt   gorm.DeletedAt `gorm:"index"`
+
+	Stats *string `gorm:"type:jsonb" json:"stats,omitempty"`
 }

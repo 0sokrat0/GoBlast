@@ -9,67 +9,72 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-const batchSize = 100
-
-// TaskNATSMessage — структура сообщения, которое приходит из NATS
+// TaskNATSMessage — структура задачи, приходящей из NATS.
 type TaskNATSMessage struct {
 	TaskID     string  `json:"task_id"` // ID задачи
 	UserID     uint    `json:"user_id"`
-	Recipients []int64 `json:"recipients"`         // ID получателей
-	Content    Content `json:"content"`            // контент
-	Priority   string  `json:"priority,omitempty"` // приоритет
-	// Schedule ... (добавьте, если нужно)
+	Recipients []int64 `json:"recipients"`
+	Content    Content `json:"content"`
+	Priority   string  `json:"priority,omitempty"`
+	// Schedule ... (если нужно)
 }
 
-// Content — описание контента (тип, текст/медиа и т.д.)
+// Content — описание контента (тип, текст/медиа и т. д.)
 type Content struct {
-	Type     string `json:"type"`      // "text", "photo", "video", ...
-	Text     string `json:"text"`      // если type="text"
-	MediaURL string `json:"media_url"` // если фото, видео, документ...
-	Caption  string `json:"caption"`   // подпись
+	Type     string `json:"type"`
+	Text     string `json:"text"`
+	MediaURL string `json:"media_url"`
+	MediaID  string `json:"media_id"`
+	Caption  string `json:"caption"`
 }
-
-// SubscribeTasks - подписка на задачи из NATS// SubscribeTasks - подписка на задачи из NATS
-// internal/worker/worker.go
 
 func SubscribeTasks(natsClient *queue.NATSClient, db *gorm.DB, botManager *BotManager) error {
 	_, err := natsClient.Conn.QueueSubscribe("tasks.create", "worker-group", func(msg *nats.Msg) {
 		var natsMsg TaskNATSMessage
-		if err := json.Unmarshal(msg.Data, &natsMsg); err != nil {
-			logger.Log.Error("Ошибка десериализации сообщения NATS", zap.Error(err))
+		if e := json.Unmarshal(msg.Data, &natsMsg); e != nil {
+			logger.Log.Error("Ошибка десериализации сообщения NATS", zap.Error(e))
+			return
+		}
+		logger.Log.Info("[Subscriber] Получено сообщение NATS",
+			zap.String("task_id", natsMsg.TaskID),
+			zap.Uint("user_id", natsMsg.UserID),
+			zap.Int("recipients_count", len(natsMsg.Recipients)),
+			zap.String("priority", natsMsg.Priority))
+
+		// Валидация
+		if e := validateTaskMessage(natsMsg); e != nil {
+			logger.Log.Error("Некорректное сообщение NATS", zap.Error(e))
 			return
 		}
 
-		// Проверка корректности данных
-		if err := validateTaskMessage(natsMsg); err != nil {
-			logger.Log.Error("Некорректное сообщение NATS", zap.Error(err))
-			return
-		}
-
-		// Получаем токен бота
+		// Ищем в БД токен бота
 		userRepo := users.NewAuthUserRepository(db)
-		userData, err := userRepo.FindByID(natsMsg.UserID)
-		if err != nil {
-			logger.Log.Error("Ошибка получения пользователя", zap.Error(err), zap.Uint("user_id", natsMsg.UserID))
+		userData, e := userRepo.FindByID(natsMsg.UserID)
+		if e != nil {
+			logger.Log.Error("Ошибка получения пользователя",
+				zap.Error(e),
+				zap.Uint("user_id", natsMsg.UserID))
 			return
 		}
 
-		botToken, err := decryptToken(userData.Token)
-		if err != nil {
-			logger.Log.Error("Ошибка дешифрования токена", zap.Error(err), zap.Uint("user_id", natsMsg.UserID))
+		botToken, e := decryptToken(userData.Token)
+		if e != nil {
+			logger.Log.Error("Ошибка дешифрования токена",
+				zap.Error(e),
+				zap.Uint("user_id", natsMsg.UserID))
 			return
 		}
 
-		// Передаем задачу в BotManager
+		// Передаём задачу в BotManager
 		botManager.StartTask(botToken, natsMsg, db)
 	})
-
 	if err != nil {
 		return err
 	}
@@ -78,34 +83,32 @@ func SubscribeTasks(natsClient *queue.NATSClient, db *gorm.DB, botManager *BotMa
 	return nil
 }
 
+// validateTaskMessage проверяет ключевые поля
 func validateTaskMessage(task TaskNATSMessage) error {
 	if task.TaskID == "" {
-		return errors.New("пустой TaskID")
+		return errors.New("пустой task_id")
 	}
 	if task.UserID == 0 {
-		return errors.New("пустой UserID")
+		return errors.New("пустой user_id")
 	}
 	if len(task.Recipients) == 0 {
 		return errors.New("пустой список получателей")
 	}
-	if task.Content.Type == "" {
+	if strings.TrimSpace(task.Content.Type) == "" {
 		return errors.New("пустой тип контента")
 	}
 	return nil
 }
 
+// decryptToken расшифровывает токен бота из userData.Token
 func decryptToken(encryptedToken string) (string, error) {
-	// Декодируем base64
-	decodedToken, err := base64.StdEncoding.DecodeString(encryptedToken)
+	decoded, err := base64.StdEncoding.DecodeString(encryptedToken)
 	if err != nil {
 		return "", err
 	}
-
-	// Дешифруем токен
-	decryptedTokenBytes, err := encryption.Decrypt(decodedToken, []byte(middleware.EncryptionKey))
+	plain, err := encryption.Decrypt(decoded, []byte(middleware.EncryptionKey))
 	if err != nil {
 		return "", err
 	}
-
-	return string(decryptedTokenBytes), nil
+	return string(plain), nil
 }

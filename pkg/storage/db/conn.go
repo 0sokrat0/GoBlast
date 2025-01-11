@@ -16,6 +16,7 @@ func InitDB(dsn string) error {
 		return err
 	}
 	err = DB.AutoMigrate(
+
 		&models.AuthUser{},
 		&models.Task{},
 	)
